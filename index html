@@ -1,0 +1,1008 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<meta name="theme-color" content="#000">
+<title>Alist Player</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root {
+  --a:#6C5CE7; --a2:#a855f7; --ag:rgba(108,92,231,.35);
+  --grad:linear-gradient(135deg,#6C5CE7,#a855f7,#ec4899);
+  --bg:#000; --s:rgba(255,255,255,.04); --s2:rgba(255,255,255,.07);
+  --s3:rgba(255,255,255,.10); --glass:rgba(12,12,18,.75);
+  --glass2:rgba(12,12,18,.88); --b:rgba(255,255,255,.06);
+  --t:#f0f0f5; --t2:rgba(255,255,255,.5); --t3:rgba(255,255,255,.3);
+  --r:14px; --r2:10px; --tr:.25s cubic-bezier(.4,0,.2,1);
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html, body {height:100%; width:100%; overflow:hidden; background:var(--bg); margin:0;}
+body{color:var(--t);font-family:'Plus Jakarta Sans',-apple-system,system-ui,sans-serif;
+  -webkit-tap-highlight-color:transparent;-webkit-font-smoothing:antialiased}
+
+/* ── Player (Iframe Style) ── */
+.player{position:relative;width:100vw;height:100vh;background:#000;
+  overflow:hidden;user-select:none;-webkit-user-select:none}
+video{width:100%;height:100%;display:block;object-fit:contain;background:#000}
+
+/* ── Resume banner ── */
+.resume-bar{position:absolute;bottom:80px;left:50%;
+  transform:translateX(-50%) translateY(20px);
+  background:var(--glass2);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);
+  border:1px solid var(--b);border-radius:50px;padding:8px 10px 8px 16px;
+  display:none;align-items:center;gap:10px;z-index:30;
+  font-size:13px;font-weight:600;color:#ddd;
+  box-shadow:0 8px 32px rgba(0,0,0,.5);
+  opacity:0;transition:all .3s ease;white-space:nowrap}
+.resume-bar.show{display:flex;opacity:1;transform:translateX(-50%) translateY(0)}
+.resume-bar svg{width:16px;height:16px;fill:var(--a2);flex-shrink:0}
+.resume-btn{background:var(--grad);color:#fff;border:none;border-radius:50px;
+  padding:6px 16px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;
+  transition:all var(--tr)}
+.resume-btn:hover{transform:scale(1.05);box-shadow:0 0 20px var(--ag)}
+.resume-dismiss{background:none;border:none;color:var(--t2);cursor:pointer;
+  padding:4px;display:flex;font-size:18px;line-height:1;border-radius:50%;
+  transition:all var(--tr)}
+.resume-dismiss:hover{color:#fff;background:var(--s2)}
+
+/* ── Gradients ── */
+.grad-top,.grad-bot{position:absolute;left:0;right:0;z-index:18;
+  opacity:0;transition:opacity .35s;pointer-events:none}
+.grad-top{top:0;height:100px;background:linear-gradient(rgba(0,0,0,.7),transparent)}
+.grad-bot{bottom:0;height:200px;background:linear-gradient(transparent,rgba(0,0,0,.85))}
+.player.show-ui .grad-top,.player.show-ui .grad-bot{opacity:1}
+
+/* ── Top bar ── */
+.top-bar{position:absolute;top:0;left:0;right:0;padding:16px 20px;z-index:22;
+  display:flex;align-items:center;gap:12px;
+  opacity:0;transform:translateY(-10px);transition:all .35s ease;pointer-events:none}
+.player.show-ui .top-bar{opacity:1;transform:translateY(0);pointer-events:auto}
+.top-title{font-size:14px;font-weight:700;text-shadow:0 2px 8px rgba(0,0,0,.8);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1;letter-spacing:.2px}
+
+/* ── Loader ── */
+.loader{position:absolute;inset:0;display:flex;align-items:center;
+  justify-content:center;z-index:10;opacity:0;pointer-events:none;transition:opacity .2s}
+.loader.on{opacity:1}
+.ld-spinner{width:50px;height:50px;position:relative}
+.ld-spinner::before{content:'';position:absolute;inset:0;border-radius:50%;
+  border:3px solid rgba(255,255,255,.08);border-top-color:var(--a);border-right-color:var(--a2);
+  animation:spin .7s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ── Center play ── */
+.center-play{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
+  width:72px;height:72px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+  z-index:8;transition:all .25s ease;background:var(--glass);
+  backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);
+  border:1.5px solid rgba(255,255,255,.1);box-shadow:0 8px 32px rgba(0,0,0,.4)}
+.center-play:hover{transform:translate(-50%,-50%) scale(1.12);background:var(--a);
+  border-color:var(--a);box-shadow:0 0 40px var(--ag)}
+.center-play svg{width:28px;height:28px;fill:#fff;margin-left:3px}
+.center-play.hide{opacity:0;pointer-events:none;transform:translate(-50%,-50%) scale(.6)}
+
+/* ── Double-tap zones ── */
+.tap-zone{position:absolute;top:0;bottom:0;width:38%;z-index:6;
+  display:flex;align-items:center;justify-content:center}
+.tap-zone.left{left:0;border-radius:0 50% 50% 0}
+.tap-zone.right{right:0;border-radius:50% 0 0 50%}
+.tap-ripple{position:absolute;width:140px;height:140px;border-radius:50%;
+  background:radial-gradient(circle,rgba(255,255,255,.12) 0%,transparent 70%);
+  transform:scale(0);opacity:0;pointer-events:none}
+.tap-ripple.pop{animation:tapPop .6s ease-out forwards}
+@keyframes tapPop{0%{transform:scale(0);opacity:.8}100%{transform:scale(2.5);opacity:0}}
+.tap-label{display:flex;flex-direction:column;align-items:center;gap:2px;
+  opacity:0;transform:scale(.5);transition:all .2s ease;pointer-events:none}
+.tap-label.show{opacity:1;transform:scale(1)}
+.tap-label svg{width:32px;height:32px;fill:#fff;filter:drop-shadow(0 2px 8px rgba(0,0,0,.6))}
+.tap-label span{font-size:14px;font-weight:800;color:#fff;text-shadow:0 2px 6px rgba(0,0,0,.7)}
+
+/* ── Popup ── */
+.popup{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%) scale(.8);
+  background:var(--glass2);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
+  padding:14px 24px;border-radius:var(--r);font-size:18px;font-weight:700;
+  z-index:12;opacity:0;pointer-events:none;transition:all .15s ease;
+  border:1px solid var(--b);box-shadow:0 8px 32px rgba(0,0,0,.5);white-space:nowrap}
+.popup.show{opacity:1;transform:translate(-50%,-50%) scale(1)}
+
+/* ── Volume HUD ── */
+.vol-hud{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
+  background:var(--glass2);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
+  padding:16px;border-radius:var(--r);z-index:12;opacity:0;pointer-events:none;
+  transition:opacity .2s;display:flex;flex-direction:column;align-items:center;gap:8px;
+  border:1px solid var(--b);box-shadow:0 8px 32px rgba(0,0,0,.5);min-width:52px}
+.vol-hud.show{opacity:1}
+.vol-hud svg{width:24px;height:24px;fill:#fff}
+.vol-hud-track{width:4px;height:65px;background:rgba(255,255,255,.1);
+  border-radius:2px;position:relative;overflow:hidden}
+.vol-hud-fill{position:absolute;bottom:0;left:0;right:0;background:var(--grad);
+  border-radius:2px;transition:height .1s}
+.vol-hud-pct{font-size:12px;font-weight:700;color:var(--t2)}
+
+/* ── Error ── */
+.error-box{position:absolute;inset:0;display:none;align-items:center;
+  justify-content:center;background:rgba(0,0,0,.92);z-index:15;
+  flex-direction:column;gap:16px}
+.error-box.on{display:flex}
+.error-box .e-icon{font-size:52px}
+.error-box .e-msg{font-size:14px;color:var(--t2);text-align:center;max-width:280px;line-height:1.5}
+.retry-btn{padding:10px 32px;background:var(--grad);color:#fff;border:none;
+  border-radius:50px;cursor:pointer;font-size:14px;font-weight:700;font-family:inherit;
+  transition:all var(--tr);box-shadow:0 4px 20px var(--ag)}
+.retry-btn:hover{transform:scale(1.08)}
+
+/* ── Controls ── */
+.ctrl{position:absolute;bottom:0;left:0;right:0;padding:0 14px 12px;z-index:20;
+  opacity:0;transform:translateY(8px);transition:all .35s ease;pointer-events:none}
+.player.show-ui .ctrl{opacity:1;transform:translateY(0);pointer-events:auto}
+
+/* ── Progress bar ── */
+.prog-outer{width:100%;padding:10px 0 6px;cursor:pointer;position:relative}
+.prog-track{width:100%;height:3px;background:rgba(255,255,255,.12);
+  border-radius:4px;position:relative;transition:height .15s;overflow:visible}
+.prog-outer:hover .prog-track{height:5px}
+.prog-buf{position:absolute;top:0;left:0;height:100%;
+  background:rgba(255,255,255,.18);border-radius:4px;pointer-events:none;transition:width .15s}
+.prog-fill{position:absolute;top:0;left:0;height:100%;background:var(--grad);
+  border-radius:4px;pointer-events:none;box-shadow:0 0 10px var(--ag)}
+.prog-dot{position:absolute;top:50%;width:14px;height:14px;border-radius:50%;
+  transform:translate(-50%,-50%) scale(0);pointer-events:none;transition:transform .15s;
+  background:#fff;box-shadow:0 0 12px var(--ag),0 2px 6px rgba(0,0,0,.3)}
+.prog-outer:hover .prog-dot{transform:translate(-50%,-50%) scale(1)}
+.prog-tip{position:absolute;bottom:calc(100% + 10px);transform:translateX(-50%);
+  background:var(--glass2);backdrop-filter:blur(12px);color:#fff;padding:4px 10px;
+  border-radius:6px;font-size:12px;font-weight:700;pointer-events:none;display:none;
+  white-space:nowrap;border:1px solid var(--b);box-shadow:0 4px 16px rgba(0,0,0,.4)}
+.prog-outer:hover .prog-tip{display:block}
+
+/* ── Buttons ── */
+.btn-row{display:flex;align-items:center;gap:2px;margin-top:2px}
+.btn{background:none;border:none;color:#fff;cursor:pointer;padding:7px;
+  display:flex;align-items:center;justify-content:center;border-radius:var(--r2);
+  transition:all var(--tr);position:relative}
+.btn:hover{background:var(--s2)}
+.btn:active{transform:scale(.9)}
+.btn svg{width:22px;height:22px;fill:#fff;transition:fill var(--tr)}
+.btn:hover svg{fill:var(--a2)}
+.btn[data-t]::after{content:attr(data-t);position:absolute;bottom:calc(100% + 6px);
+  left:50%;transform:translateX(-50%);background:var(--glass2);backdrop-filter:blur(12px);
+  color:#fff;padding:4px 10px;border-radius:6px;font-size:11px;font-weight:600;
+  white-space:nowrap;opacity:0;pointer-events:none;transition:opacity .15s;
+  border:1px solid var(--b);box-shadow:0 4px 12px rgba(0,0,0,.3)}
+.btn:hover[data-t]::after{opacity:1}
+
+/* ── Volume ── */
+.vol-wrap{display:flex;align-items:center;gap:2px}
+.vol-rail{width:0;overflow:hidden;transition:width .3s ease;display:flex;align-items:center}
+.vol-wrap:hover .vol-rail{width:74px}
+.vol-range{width:74px;height:4px;-webkit-appearance:none;appearance:none;
+  background:linear-gradient(90deg,var(--a) 0%,var(--a2) 100%);border-radius:2px;
+  outline:none;cursor:pointer}
+.vol-range::-webkit-slider-runnable-track{height:4px;border-radius:2px;background:rgba(255,255,255,.15)}
+.vol-range::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:14px;
+  background:#fff;border-radius:50%;cursor:pointer;margin-top:-5px;
+  box-shadow:0 0 6px rgba(0,0,0,.3);transition:transform .1s}
+.vol-range::-webkit-slider-thumb:hover{transform:scale(1.2)}
+
+/* ── Time ── */
+.time-txt{font-size:12px;font-weight:600;color:rgba(255,255,255,.7);
+  white-space:nowrap;padding:0 6px;letter-spacing:.5px;font-variant-numeric:tabular-nums}
+.time-sep{color:var(--t3)}
+.spacer{flex:1}
+
+/* ── Speed panel ── */
+.spd-wrap{position:relative}
+.spd-tag{font-size:12px;font-weight:700;padding:3px 8px;background:var(--s2);
+  border-radius:6px;transition:all var(--tr)}
+.spd-tag:hover{background:var(--s3)}
+.spd-panel{position:absolute;bottom:48px;right:-10px;background:var(--glass2);
+  backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);border-radius:var(--r);
+  padding:8px 0;min-width:150px;display:none;border:1px solid var(--b);
+  box-shadow:0 12px 48px rgba(0,0,0,.6);z-index:30;overflow:hidden}
+.spd-panel.on{display:block;animation:panelIn .2s ease}
+@keyframes panelIn{from{opacity:0;transform:translateY(8px) scale(.95)}to{opacity:1;transform:translateY(0) scale(1)}}
+.spd-head{padding:8px 16px 10px;font-size:11px;font-weight:700;color:var(--t2);
+  text-transform:uppercase;letter-spacing:1px;border-bottom:1px solid var(--b)}
+.spd-opt{padding:9px 16px;cursor:pointer;font-size:13px;font-weight:600;
+  transition:all .1s;display:flex;align-items:center;gap:10px;color:rgba(255,255,255,.7)}
+.spd-opt:hover{background:var(--s2);color:#fff}
+.spd-opt.act{color:var(--a2)}
+.spd-opt .ck{width:16px;text-align:center;font-size:11px}
+.spd-opt.act .ck::before{content:"✓"}
+
+/* ── Mobile ── */
+@media(max-width:768px){
+  .ctrl{padding:0 8px 8px}
+  .vol-wrap:hover .vol-rail{width:50px}
+  .vol-range{width:50px}
+  .btn{padding:5px}
+  .btn svg{width:20px;height:20px}
+  .btn[data-t]::after{display:none}
+  .top-title{font-size:13px}
+}
+@media(max-width:400px){
+  .time-txt{font-size:11px}
+  .spd-tag{font-size:11px;padding:2px 6px}
+}
+</style>
+</head>
+<body>
+
+<div class="player" id="P">
+  <video id="V" playsinline preload="auto"></video>
+  <div class="grad-top"></div>
+  <div class="grad-bot"></div>
+
+  <div class="top-bar">
+    <div class="top-title" id="topTitle">Alist Stream</div>
+  </div>
+
+  <div class="resume-bar" id="resumeBar">
+    <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 14.5v-9l6 4.5-6 4.5z"/></svg>
+    <span id="resumeText">Resume from 0:00</span>
+    <button class="resume-btn" id="resumeBtn">Resume</button>
+    <button class="resume-dismiss" id="resumeDismiss">×</button>
+  </div>
+
+  <div class="loader" id="loader"><div class="ld-spinner"></div></div>
+
+  <div class="center-play" id="cPlay">
+    <svg viewBox="0 0 24 24"><polygon points="5,3 19,12 5,21"/></svg>
+  </div>
+
+  <div class="tap-zone left" id="tapL">
+    <div class="tap-ripple" id="ripL"></div>
+    <div class="tap-label" id="lblL">
+      <svg viewBox="0 0 24 24"><path d="M11.99 5V1l-5 5 5 5V7c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6h-2c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8-8z"/></svg>
+      <span id="txtL">10s</span>
+    </div>
+  </div>
+  <div class="tap-zone right" id="tapR">
+    <div class="tap-ripple" id="ripR"></div>
+    <div class="tap-label" id="lblR">
+      <svg viewBox="0 0 24 24"><path d="M12.01 5V1l5 5-5 5V7c-3.31 0-6 2.69-6 6s2.69 6 6 6 6-2.69 6-6h2c0 4.42-3.58 8-8 8s-8-3.58-8-8 3.58-8 8-8z"/></svg>
+      <span id="txtR">10s</span>
+    </div>
+  </div>
+
+  <div class="popup" id="popup"></div>
+
+  <div class="vol-hud" id="vHud">
+    <svg viewBox="0 0 24 24"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02z"/></svg>
+    <div class="vol-hud-track"><div class="vol-hud-fill" id="vHudFill"></div></div>
+    <div class="vol-hud-pct" id="vHudPct">100%</div>
+  </div>
+
+  <div class="error-box" id="errBox">
+    <div class="e-icon">😵</div>
+    <div class="e-msg" id="errMsg">Something went wrong</div>
+    <button class="retry-btn" id="retryBtn">Try Again</button>
+  </div>
+
+  <div class="ctrl" id="ctrl">
+    <div class="prog-outer" id="pOuter">
+      <div class="prog-track">
+        <div class="prog-buf" id="pBuf"></div>
+        <div class="prog-fill" id="pFill"></div>
+        <div class="prog-dot" id="pDot"></div>
+      </div>
+      <div class="prog-tip" id="pTip">0:00</div>
+    </div>
+    <div class="btn-row">
+      <button class="btn" id="btnPlay" data-t="Play (k)">
+        <svg id="iPlay" viewBox="0 0 24 24"><polygon points="5,3 19,12 5,21"/></svg>
+        <svg id="iPause" viewBox="0 0 24 24" style="display:none">
+          <rect x="5" y="3" width="4" height="18" rx="1"/>
+          <rect x="15" y="3" width="4" height="18" rx="1"/>
+        </svg>
+      </button>
+      <button class="btn" id="btnRew" data-t="-10s (j)">
+        <svg viewBox="0 0 24 24"><path d="M12.5 5V1l-5 5 5 5V7c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6h-2c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8-8z"/><text x="9.5" y="15.5" font-size="6.5" fill="white" font-weight="bold" font-family="sans-serif">10</text></svg>
+      </button>
+      <button class="btn" id="btnFwd" data-t="+10s (l)">
+        <svg viewBox="0 0 24 24"><path d="M11.5 5V1l5 5-5 5V7c-3.31 0-6 2.69-6 6s2.69 6 6 6 6-2.69 6-6h2c0 4.42-3.58 8-8 8s-8-3.58-8-8 3.58-8 8-8z"/><text x="8.5" y="15.5" font-size="6.5" fill="white" font-weight="bold" font-family="sans-serif">10</text></svg>
+      </button>
+      <div class="vol-wrap">
+        <button class="btn" id="btnMute" data-t="Mute (m)">
+          <svg id="iVol" viewBox="0 0 24 24"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/></svg>
+          <svg id="iMute" viewBox="0 0 24 24" style="display:none"><path d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z"/></svg>
+        </button>
+        <div class="vol-rail">
+          <input type="range" class="vol-range" id="volR" min="0" max="100" value="100">
+        </div>
+      </div>
+      <span class="time-txt">
+        <span id="tCur">0:00</span><span class="time-sep"> / </span><span id="tDur">0:00</span>
+      </span>
+      <div class="spacer"></div>
+      <div class="spd-wrap" id="spdW">
+        <button class="btn"><span class="spd-tag" id="spdTag">1x</span></button>
+        <div class="spd-panel" id="spdP">
+          <div class="spd-head">Speed</div>
+          <div class="spd-opt" data-s="0.25"><span class="ck"></span>0.25x</div>
+          <div class="spd-opt" data-s="0.5"><span class="ck"></span>0.5x</div>
+          <div class="spd-opt" data-s="0.75"><span class="ck"></span>0.75x</div>
+          <div class="spd-opt act" data-s="1"><span class="ck"></span>Normal</div>
+          <div class="spd-opt" data-s="1.25"><span class="ck"></span>1.25x</div>
+          <div class="spd-opt" data-s="1.5"><span class="ck"></span>1.5x</div>
+          <div class="spd-opt" data-s="1.75"><span class="ck"></span>1.75x</div>
+          <div class="spd-opt" data-s="2"><span class="ck"></span>2x</div>
+        </div>
+      </div>
+      <button class="btn" id="btnPip" data-t="PiP (p)">
+        <svg viewBox="0 0 24 24"><path d="M19 7h-8v6h8V7zm2-4H3c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h18c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H3V5h18v14z"/></svg>
+      </button>
+      <button class="btn" id="btnFs" data-t="Fullscreen (f)">
+        <svg id="iFsIn" viewBox="0 0 24 24"><path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/></svg>
+        <svg id="iFsOut" viewBox="0 0 24 24" style="display:none"><path d="M5 16h3v3h2v-5H5v2zm3-8H5v2h5V5H8v3zm6 11h2v-3h3v-2h-5v5zm2-11V5h-2v5h5V8h-3z"/></svg>
+      </button>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.15/dist/hls.min.js"></script>
+<script>
+(function(){'use strict';
+
+/* ── Params (Alist URL setup) ── */
+const U = new URLSearchParams(location.search);
+const videoUrl = U.get('url');
+
+/* ── DOM shortcuts ── */
+const $ = id => document.getElementById(id);
+const V=$('V'),P=$('P'),loader=$('loader'),cPlay=$('cPlay');
+const popup=$('popup'),vHud=$('vHud'),vHudFill=$('vHudFill'),vHudPct=$('vHudPct');
+const errBox=$('errBox'),errMsg=$('errMsg');
+const pOuter=$('pOuter'),pBuf=$('pBuf'),pFill=$('pFill'),pDot=$('pDot'),pTip=$('pTip');
+const btnPlay=$('btnPlay'),iPlay=$('iPlay'),iPause=$('iPause');
+const btnMute=$('btnMute'),iVol=$('iVol'),iMute=$('iMute');
+const volR=$('volR'),tCur=$('tCur'),tDur=$('tDur');
+const spdTag=$('spdTag'),spdP=$('spdP');
+const iFsIn=$('iFsIn'),iFsOut=$('iFsOut');
+const resumeBar=$('resumeBar'),resumeText=$('resumeText');
+const resumeBtn=$('resumeBtn'),resumeDismiss=$('resumeDismiss');
+
+if(!videoUrl) {
+    $('topTitle').textContent = 'No Video URL Provided';
+    return;
+}
+
+/* ── Set Title from URL ── */
+try {
+    let rawTitle = videoUrl.split('/').pop().split('?')[0];
+    let decodedTitle = decodeURIComponent(rawTitle) || 'Alist Stream';
+    $('topTitle').textContent = decodedTitle;
+    document.title = decodedTitle;
+} catch(e) {
+    $('topTitle').textContent = 'Alist Stream';
+}
+
+let hls=null,popT=null,volT=null,hideT=null,tapT=null;
+let tapN=0,seeking=false,uiVisible=false,<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<meta name="theme-color" content="#000">
+<title>Alist Player</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root {
+  --a:#6C5CE7; --a2:#a855f7; --ag:rgba(108,92,231,.35);
+  --grad:linear-gradient(135deg,#6C5CE7,#a855f7,#ec4899);
+  --bg:#000; --s:rgba(255,255,255,.04); --s2:rgba(255,255,255,.07);
+  --s3:rgba(255,255,255,.10); --glass:rgba(12,12,18,.75);
+  --glass2:rgba(12,12,18,.88); --b:rgba(255,255,255,.06);
+  --t:#f0f0f5; --t2:rgba(255,255,255,.5); --t3:rgba(255,255,255,.3);
+  --r:14px; --r2:10px; --tr:.25s cubic-bezier(.4,0,.2,1);
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html, body {height:100%; width:100%; overflow:hidden; background:var(--bg); margin:0;}
+body{color:var(--t);font-family:'Plus Jakarta Sans',-apple-system,system-ui,sans-serif;
+  -webkit-tap-highlight-color:transparent;-webkit-font-smoothing:antialiased}
+
+/* ── Player (Iframe Style) ── */
+.player{position:relative;width:100vw;height:100vh;background:#000;
+  overflow:hidden;user-select:none;-webkit-user-select:none}
+video{width:100%;height:100%;display:block;object-fit:contain;background:#000}
+
+/* ── Resume banner ── */
+.resume-bar{position:absolute;bottom:80px;left:50%;
+  transform:translateX(-50%) translateY(20px);
+  background:var(--glass2);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);
+  border:1px solid var(--b);border-radius:50px;padding:8px 10px 8px 16px;
+  display:none;align-items:center;gap:10px;z-index:30;
+  font-size:13px;font-weight:600;color:#ddd;
+  box-shadow:0 8px 32px rgba(0,0,0,.5);
+  opacity:0;transition:all .3s ease;white-space:nowrap}
+.resume-bar.show{display:flex;opacity:1;transform:translateX(-50%) translateY(0)}
+.resume-bar svg{width:16px;height:16px;fill:var(--a2);flex-shrink:0}
+.resume-btn{background:var(--grad);color:#fff;border:none;border-radius:50px;
+  padding:6px 16px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;
+  transition:all var(--tr)}
+.resume-btn:hover{transform:scale(1.05);box-shadow:0 0 20px var(--ag)}
+.resume-dismiss{background:none;border:none;color:var(--t2);cursor:pointer;
+  padding:4px;display:flex;font-size:18px;line-height:1;border-radius:50%;
+  transition:all var(--tr)}
+.resume-dismiss:hover{color:#fff;background:var(--s2)}
+
+/* ── Gradients ── */
+.grad-top,.grad-bot{position:absolute;left:0;right:0;z-index:18;
+  opacity:0;transition:opacity .35s;pointer-events:none}
+.grad-top{top:0;height:100px;background:linear-gradient(rgba(0,0,0,.7),transparent)}
+.grad-bot{bottom:0;height:200px;background:linear-gradient(transparent,rgba(0,0,0,.85))}
+.player.show-ui .grad-top,.player.show-ui .grad-bot{opacity:1}
+
+/* ── Top bar ── */
+.top-bar{position:absolute;top:0;left:0;right:0;padding:16px 20px;z-index:22;
+  display:flex;align-items:center;gap:12px;
+  opacity:0;transform:translateY(-10px);transition:all .35s ease;pointer-events:none}
+.player.show-ui .top-bar{opacity:1;transform:translateY(0);pointer-events:auto}
+.top-title{font-size:14px;font-weight:700;text-shadow:0 2px 8px rgba(0,0,0,.8);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1;letter-spacing:.2px}
+
+/* ── Loader ── */
+.loader{position:absolute;inset:0;display:flex;align-items:center;
+  justify-content:center;z-index:10;opacity:0;pointer-events:none;transition:opacity .2s}
+.loader.on{opacity:1}
+.ld-spinner{width:50px;height:50px;position:relative}
+.ld-spinner::before{content:'';position:absolute;inset:0;border-radius:50%;
+  border:3px solid rgba(255,255,255,.08);border-top-color:var(--a);border-right-color:var(--a2);
+  animation:spin .7s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ── Center play ── */
+.center-play{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
+  width:72px;height:72px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+  z-index:8;transition:all .25s ease;background:var(--glass);
+  backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);
+  border:1.5px solid rgba(255,255,255,.1);box-shadow:0 8px 32px rgba(0,0,0,.4)}
+.center-play:hover{transform:translate(-50%,-50%) scale(1.12);background:var(--a);
+  border-color:var(--a);box-shadow:0 0 40px var(--ag)}
+.center-play svg{width:28px;height:28px;fill:#fff;margin-left:3px}
+.center-play.hide{opacity:0;pointer-events:none;transform:translate(-50%,-50%) scale(.6)}
+
+/* ── Double-tap zones ── */
+.tap-zone{position:absolute;top:0;bottom:0;width:38%;z-index:6;
+  display:flex;align-items:center;justify-content:center}
+.tap-zone.left{left:0;border-radius:0 50% 50% 0}
+.tap-zone.right{right:0;border-radius:50% 0 0 50%}
+.tap-ripple{position:absolute;width:140px;height:140px;border-radius:50%;
+  background:radial-gradient(circle,rgba(255,255,255,.12) 0%,transparent 70%);
+  transform:scale(0);opacity:0;pointer-events:none}
+.tap-ripple.pop{animation:tapPop .6s ease-out forwards}
+@keyframes tapPop{0%{transform:scale(0);opacity:.8}100%{transform:scale(2.5);opacity:0}}
+.tap-label{display:flex;flex-direction:column;align-items:center;gap:2px;
+  opacity:0;transform:scale(.5);transition:all .2s ease;pointer-events:none}
+.tap-label.show{opacity:1;transform:scale(1)}
+.tap-label svg{width:32px;height:32px;fill:#fff;filter:drop-shadow(0 2px 8px rgba(0,0,0,.6))}
+.tap-label span{font-size:14px;font-weight:800;color:#fff;text-shadow:0 2px 6px rgba(0,0,0,.7)}
+
+/* ── Popup ── */
+.popup{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%) scale(.8);
+  background:var(--glass2);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
+  padding:14px 24px;border-radius:var(--r);font-size:18px;font-weight:700;
+  z-index:12;opacity:0;pointer-events:none;transition:all .15s ease;
+  border:1px solid var(--b);box-shadow:0 8px 32px rgba(0,0,0,.5);white-space:nowrap}
+.popup.show{opacity:1;transform:translate(-50%,-50%) scale(1)}
+
+/* ── Volume HUD ── */
+.vol-hud{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
+  background:var(--glass2);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
+  padding:16px;border-radius:var(--r);z-index:12;opacity:0;pointer-events:none;
+  transition:opacity .2s;display:flex;flex-direction:column;align-items:center;gap:8px;
+  border:1px solid var(--b);box-shadow:0 8px 32px rgba(0,0,0,.5);min-width:52px}
+.vol-hud.show{opacity:1}
+.vol-hud svg{width:24px;height:24px;fill:#fff}
+.vol-hud-track{width:4px;height:65px;background:rgba(255,255,255,.1);
+  border-radius:2px;position:relative;overflow:hidden}
+.vol-hud-fill{position:absolute;bottom:0;left:0;right:0;background:var(--grad);
+  border-radius:2px;transition:height .1s}
+.vol-hud-pct{font-size:12px;font-weight:700;color:var(--t2)}
+
+/* ── Error ── */
+.error-box{position:absolute;inset:0;display:none;align-items:center;
+  justify-content:center;background:rgba(0,0,0,.92);z-index:15;
+  flex-direction:column;gap:16px}
+.error-box.on{display:flex}
+.error-box .e-icon{font-size:52px}
+.error-box .e-msg{font-size:14px;color:var(--t2);text-align:center;max-width:280px;line-height:1.5}
+.retry-btn{padding:10px 32px;background:var(--grad);color:#fff;border:none;
+  border-radius:50px;cursor:pointer;font-size:14px;font-weight:700;font-family:inherit;
+  transition:all var(--tr);box-shadow:0 4px 20px var(--ag)}
+.retry-btn:hover{transform:scale(1.08)}
+
+/* ── Controls ── */
+.ctrl{position:absolute;bottom:0;left:0;right:0;padding:0 14px 12px;z-index:20;
+  opacity:0;transform:translateY(8px);transition:all .35s ease;pointer-events:none}
+.player.show-ui .ctrl{opacity:1;transform:translateY(0);pointer-events:auto}
+
+/* ── Progress bar ── */
+.prog-outer{width:100%;padding:10px 0 6px;cursor:pointer;position:relative}
+.prog-track{width:100%;height:3px;background:rgba(255,255,255,.12);
+  border-radius:4px;position:relative;transition:height .15s;overflow:visible}
+.prog-outer:hover .prog-track{height:5px}
+.prog-buf{position:absolute;top:0;left:0;height:100%;
+  background:rgba(255,255,255,.18);border-radius:4px;pointer-events:none;transition:width .15s}
+.prog-fill{position:absolute;top:0;left:0;height:100%;background:var(--grad);
+  border-radius:4px;pointer-events:none;box-shadow:0 0 10px var(--ag)}
+.prog-dot{position:absolute;top:50%;width:14px;height:14px;border-radius:50%;
+  transform:translate(-50%,-50%) scale(0);pointer-events:none;transition:transform .15s;
+  background:#fff;box-shadow:0 0 12px var(--ag),0 2px 6px rgba(0,0,0,.3)}
+.prog-outer:hover .prog-dot{transform:translate(-50%,-50%) scale(1)}
+.prog-tip{position:absolute;bottom:calc(100% + 10px);transform:translateX(-50%);
+  background:var(--glass2);backdrop-filter:blur(12px);color:#fff;padding:4px 10px;
+  border-radius:6px;font-size:12px;font-weight:700;pointer-events:none;display:none;
+  white-space:nowrap;border:1px solid var(--b);box-shadow:0 4px 16px rgba(0,0,0,.4)}
+.prog-outer:hover .prog-tip{display:block}
+
+/* ── Buttons ── */
+.btn-row{display:flex;align-items:center;gap:2px;margin-top:2px}
+.btn{background:none;border:none;color:#fff;cursor:pointer;padding:7px;
+  display:flex;align-items:center;justify-content:center;border-radius:var(--r2);
+  transition:all var(--tr);position:relative}
+.btn:hover{background:var(--s2)}
+.btn:active{transform:scale(.9)}
+.btn svg{width:22px;height:22px;fill:#fff;transition:fill var(--tr)}
+.btn:hover svg{fill:var(--a2)}
+.btn[data-t]::after{content:attr(data-t);position:absolute;bottom:calc(100% + 6px);
+  left:50%;transform:translateX(-50%);background:var(--glass2);backdrop-filter:blur(12px);
+  color:#fff;padding:4px 10px;border-radius:6px;font-size:11px;font-weight:600;
+  white-space:nowrap;opacity:0;pointer-events:none;transition:opacity .15s;
+  border:1px solid var(--b);box-shadow:0 4px 12px rgba(0,0,0,.3)}
+.btn:hover[data-t]::after{opacity:1}
+
+/* ── Volume ── */
+.vol-wrap{display:flex;align-items:center;gap:2px}
+.vol-rail{width:0;overflow:hidden;transition:width .3s ease;display:flex;align-items:center}
+.vol-wrap:hover .vol-rail{width:74px}
+.vol-range{width:74px;height:4px;-webkit-appearance:none;appearance:none;
+  background:linear-gradient(90deg,var(--a) 0%,var(--a2) 100%);border-radius:2px;
+  outline:none;cursor:pointer}
+.vol-range::-webkit-slider-runnable-track{height:4px;border-radius:2px;background:rgba(255,255,255,.15)}
+.vol-range::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:14px;
+  background:#fff;border-radius:50%;cursor:pointer;margin-top:-5px;
+  box-shadow:0 0 6px rgba(0,0,0,.3);transition:transform .1s}
+.vol-range::-webkit-slider-thumb:hover{transform:scale(1.2)}
+
+/* ── Time ── */
+.time-txt{font-size:12px;font-weight:600;color:rgba(255,255,255,.7);
+  white-space:nowrap;padding:0 6px;letter-spacing:.5px;font-variant-numeric:tabular-nums}
+.time-sep{color:var(--t3)}
+.spacer{flex:1}
+
+/* ── Speed panel ── */
+.spd-wrap{position:relative}
+.spd-tag{font-size:12px;font-weight:700;padding:3px 8px;background:var(--s2);
+  border-radius:6px;transition:all var(--tr)}
+.spd-tag:hover{background:var(--s3)}
+.spd-panel{position:absolute;bottom:48px;right:-10px;background:var(--glass2);
+  backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);border-radius:var(--r);
+  padding:8px 0;min-width:150px;display:none;border:1px solid var(--b);
+  box-shadow:0 12px 48px rgba(0,0,0,.6);z-index:30;overflow:hidden}
+.spd-panel.on{display:block;animation:panelIn .2s ease}
+@keyframes panelIn{from{opacity:0;transform:translateY(8px) scale(.95)}to{opacity:1;transform:translateY(0) scale(1)}}
+.spd-head{padding:8px 16px 10px;font-size:11px;font-weight:700;color:var(--t2);
+  text-transform:uppercase;letter-spacing:1px;border-bottom:1px solid var(--b)}
+.spd-opt{padding:9px 16px;cursor:pointer;font-size:13px;font-weight:600;
+  transition:all .1s;display:flex;align-items:center;gap:10px;color:rgba(255,255,255,.7)}
+.spd-opt:hover{background:var(--s2);color:#fff}
+.spd-opt.act{color:var(--a2)}
+.spd-opt .ck{width:16px;text-align:center;font-size:11px}
+.spd-opt.act .ck::before{content:"✓"}
+
+/* ── Mobile ── */
+@media(max-width:768px){
+  .ctrl{padding:0 8px 8px}
+  .vol-wrap:hover .vol-rail{width:50px}
+  .vol-range{width:50px}
+  .btn{padding:5px}
+  .btn svg{width:20px;height:20px}
+  .btn[data-t]::after{display:none}
+  .top-title{font-size:13px}
+}
+@media(max-width:400px){
+  .time-txt{font-size:11px}
+  .spd-tag{font-size:11px;padding:2px 6px}
+}
+</style>
+</head>
+<body>
+
+<div class="player" id="P">
+  <video id="V" playsinline preload="auto"></video>
+  <div class="grad-top"></div>
+  <div class="grad-bot"></div>
+
+  <div class="top-bar">
+    <div class="top-title" id="topTitle">Alist Stream</div>
+  </div>
+
+  <div class="resume-bar" id="resumeBar">
+    <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 14.5v-9l6 4.5-6 4.5z"/></svg>
+    <span id="resumeText">Resume from 0:00</span>
+    <button class="resume-btn" id="resumeBtn">Resume</button>
+    <button class="resume-dismiss" id="resumeDismiss">×</button>
+  </div>
+
+  <div class="loader" id="loader"><div class="ld-spinner"></div></div>
+
+  <div class="center-play" id="cPlay">
+    <svg viewBox="0 0 24 24"><polygon points="5,3 19,12 5,21"/></svg>
+  </div>
+
+  <div class="tap-zone left" id="tapL">
+    <div class="tap-ripple" id="ripL"></div>
+    <div class="tap-label" id="lblL">
+      <svg viewBox="0 0 24 24"><path d="M11.99 5V1l-5 5 5 5V7c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6h-2c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8-8z"/></svg>
+      <span id="txtL">10s</span>
+    </div>
+  </div>
+  <div class="tap-zone right" id="tapR">
+    <div class="tap-ripple" id="ripR"></div>
+    <div class="tap-label" id="lblR">
+      <svg viewBox="0 0 24 24"><path d="M12.01 5V1l5 5-5 5V7c-3.31 0-6 2.69-6 6s2.69 6 6 6 6-2.69 6-6h2c0 4.42-3.58 8-8 8s-8-3.58-8-8 3.58-8 8-8z"/></svg>
+      <span id="txtR">10s</span>
+    </div>
+  </div>
+
+  <div class="popup" id="popup"></div>
+
+  <div class="vol-hud" id="vHud">
+    <svg viewBox="0 0 24 24"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02z"/></svg>
+    <div class="vol-hud-track"><div class="vol-hud-fill" id="vHudFill"></div></div>
+    <div class="vol-hud-pct" id="vHudPct">100%</div>
+  </div>
+
+  <div class="error-box" id="errBox">
+    <div class="e-icon">😵</div>
+    <div class="e-msg" id="errMsg">Something went wrong</div>
+    <button class="retry-btn" id="retryBtn">Try Again</button>
+  </div>
+
+  <div class="ctrl" id="ctrl">
+    <div class="prog-outer" id="pOuter">
+      <div class="prog-track">
+        <div class="prog-buf" id="pBuf"></div>
+        <div class="prog-fill" id="pFill"></div>
+        <div class="prog-dot" id="pDot"></div>
+      </div>
+      <div class="prog-tip" id="pTip">0:00</div>
+    </div>
+    <div class="btn-row">
+      <button class="btn" id="btnPlay" data-t="Play (k)">
+        <svg id="iPlay" viewBox="0 0 24 24"><polygon points="5,3 19,12 5,21"/></svg>
+        <svg id="iPause" viewBox="0 0 24 24" style="display:none">
+          <rect x="5" y="3" width="4" height="18" rx="1"/>
+          <rect x="15" y="3" width="4" height="18" rx="1"/>
+        </svg>
+      </button>
+      <button class="btn" id="btnRew" data-t="-10s (j)">
+        <svg viewBox="0 0 24 24"><path d="M12.5 5V1l-5 5 5 5V7c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6h-2c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8-8z"/><text x="9.5" y="15.5" font-size="6.5" fill="white" font-weight="bold" font-family="sans-serif">10</text></svg>
+      </button>
+      <button class="btn" id="btnFwd" data-t="+10s (l)">
+        <svg viewBox="0 0 24 24"><path d="M11.5 5V1l5 5-5 5V7c-3.31 0-6 2.69-6 6s2.69 6 6 6 6-2.69 6-6h2c0 4.42-3.58 8-8 8s-8-3.58-8-8 3.58-8 8-8z"/><text x="8.5" y="15.5" font-size="6.5" fill="white" font-weight="bold" font-family="sans-serif">10</text></svg>
+      </button>
+      <div class="vol-wrap">
+        <button class="btn" id="btnMute" data-t="Mute (m)">
+          <svg id="iVol" viewBox="0 0 24 24"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/></svg>
+          <svg id="iMute" viewBox="0 0 24 24" style="display:none"><path d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z"/></svg>
+        </button>
+        <div class="vol-rail">
+          <input type="range" class="vol-range" id="volR" min="0" max="100" value="100">
+        </div>
+      </div>
+      <span class="time-txt">
+        <span id="tCur">0:00</span><span class="time-sep"> / </span><span id="tDur">0:00</span>
+      </span>
+      <div class="spacer"></div>
+      <div class="spd-wrap" id="spdW">
+        <button class="btn"><span class="spd-tag" id="spdTag">1x</span></button>
+        <div class="spd-panel" id="spdP">
+          <div class="spd-head">Speed</div>
+          <div class="spd-opt" data-s="0.25"><span class="ck"></span>0.25x</div>
+          <div class="spd-opt" data-s="0.5"><span class="ck"></span>0.5x</div>
+          <div class="spd-opt" data-s="0.75"><span class="ck"></span>0.75x</div>
+          <div class="spd-opt act" data-s="1"><span class="ck"></span>Normal</div>
+          <div class="spd-opt" data-s="1.25"><span class="ck"></span>1.25x</div>
+          <div class="spd-opt" data-s="1.5"><span class="ck"></span>1.5x</div>
+          <div class="spd-opt" data-s="1.75"><span class="ck"></span>1.75x</div>
+          <div class="spd-opt" data-s="2"><span class="ck"></span>2x</div>
+        </div>
+      </div>
+      <button class="btn" id="btnPip" data-t="PiP (p)">
+        <svg viewBox="0 0 24 24"><path d="M19 7h-8v6h8V7zm2-4H3c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h18c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H3V5h18v14z"/></svg>
+      </button>
+      <button class="btn" id="btnFs" data-t="Fullscreen (f)">
+        <svg id="iFsIn" viewBox="0 0 24 24"><path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/></svg>
+        <svg id="iFsOut" viewBox="0 0 24 24" style="display:none"><path d="M5 16h3v3h2v-5H5v2zm3-8H5v2h5V5H8v3zm6 11h2v-3h3v-2h-5v5zm2-11V5h-2v5h5V8h-3z"/></svg>
+      </button>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.15/dist/hls.min.js"></script>
+<script>
+(function(){'use strict';
+
+/* ── Params (Alist URL setup) ── */
+const U = new URLSearchParams(location.search);
+const videoUrl = U.get('url');
+
+/* ── DOM shortcuts ── */
+const $ = id => document.getElementById(id);
+const V=$('V'),P=$('P'),loader=$('loader'),cPlay=$('cPlay');
+const popup=$('popup'),vHud=$('vHud'),vHudFill=$('vHudFill'),vHudPct=$('vHudPct');
+const errBox=$('errBox'),errMsg=$('errMsg');
+const pOuter=$('pOuter'),pBuf=$('pBuf'),pFill=$('pFill'),pDot=$('pDot'),pTip=$('pTip');
+const btnPlay=$('btnPlay'),iPlay=$('iPlay'),iPause=$('iPause');
+const btnMute=$('btnMute'),iVol=$('iVol'),iMute=$('iMute');
+const volR=$('volR'),tCur=$('tCur'),tDur=$('tDur');
+const spdTag=$('spdTag'),spdP=$('spdP');
+const iFsIn=$('iFsIn'),iFsOut=$('iFsOut');
+const resumeBar=$('resumeBar'),resumeText=$('resumeText');
+const resumeBtn=$('resumeBtn'),resumeDismiss=$('resumeDismiss');
+
+if(!videoUrl) {
+    $('topTitle').textContent = 'No Video URL Provided';
+    return;
+}
+
+/* ── Set Title from URL ── */
+try {
+    let rawTitle = videoUrl.split('/').pop().split('?')[0];
+    let decodedTitle = decodeURIComponent(rawTitle) || 'Alist Stream';
+    $('topTitle').textContent = decodedTitle;
+    document.title = decodedTitle;
+} catch(e) {
+    $('topTitle').textContent = 'Alist Stream';
+}
+
+let hls=null,popT=null,volT=null,hideT=null,tapT=null;
+let tapN=0,seeking=false,uiVisible=false,savedTime=0;
+
+/* ── LocalStorage helpers ── */
+const safeKey = btoa(videoUrl).substring(0, 30);
+const SK = 'vpos_' + safeKey;
+const SV = 'vvol';
+const savePos=()=>{
+  if(V.currentTime>2&&V.duration&&V.currentTime<V.duration-2)
+    try{localStorage.setItem(SK,V.currentTime.toFixed(1))}catch(e){}
+};
+const loadPos=()=>{try{return parseFloat(localStorage.getItem(SK))||0}catch(e){return 0}};
+const clearPos=()=>{try{localStorage.removeItem(SK)}catch(e){}};
+const saveVol=()=>{try{localStorage.setItem(SV,JSON.stringify({v:V.volume,m:V.muted}))}catch(e){}};
+const loadVol=()=>{
+  try{const d=JSON.parse(localStorage.getItem(SV));if(d){V.volume=d.v;V.muted=d.m;updVolUI()}}catch(e){}
+};
+setInterval(savePos,3000);
+window.addEventListener('beforeunload',savePos);
+document.addEventListener('visibilitychange',()=>{if(document.hidden)savePos()});
+
+/* ── Player init ── */
+function init(){
+  errBox.classList.remove('on');loader.classList.add('on');
+  if(hls){hls.destroy();hls=null}
+
+  const isHls = videoUrl.includes('.m3u8');
+
+  if(isHls && Hls.isSupported()){
+    hls=new Hls({
+      maxBufferLength:30, maxMaxBufferLength:60,
+      maxBufferSize:60*1e6, maxBufferHole:0.5,
+      startLevel:-1, autoStartLoad:true,
+      abrEwmaDefaultEstimate:8e6,
+      abrBandWidthFactor:0.95, abrBandWidthUpFactor:0.7,
+      enableWorker:true, startFragPrefetch:true, progressive:true,
+      fragLoadingTimeOut:15000, fragLoadingMaxRetry:6, fragLoadingRetryDelay:500,
+      maxFragLookUpTolerance:0.25,
+    });
+    hls.loadSource(videoUrl);
+    hls.attachMedia(V);
+    hls.on(Hls.Events.MANIFEST_PARSED,()=>{
+      loader.classList.remove('on');loadVol();checkResume();
+    });
+    hls.on(Hls.Events.FRAG_BUFFERED,updBuf);
+    hls.on(Hls.Events.ERROR,(e,d)=>{
+      if(d.fatal){
+        if(d.type===Hls.ErrorTypes.NETWORK_ERROR){
+          errMsg.textContent='Network error — retrying…';
+          errBox.classList.add('on');loader.classList.remove('on');
+          setTimeout(()=>{if(hls)hls.startLoad();errBox.classList.remove('on')},2500);
+        } else if(d.type===Hls.ErrorTypes.MEDIA_ERROR){
+          hls.recoverMediaError();
+        } else {
+          errMsg.textContent='Playback error';
+          errBox.classList.add('on');loader.classList.remove('on');
+        }
+      }
+    });
+  } else if (V.canPlayType('application/vnd.apple.mpegurl') || !isHls) {
+    V.src = videoUrl;
+    V.addEventListener('loadedmetadata',()=>{loader.classList.remove('on');loadVol();checkResume()});
+    V.addEventListener('error', () => {
+        errMsg.textContent='Failed to load video';
+        errBox.classList.add('on');loader.classList.remove('on');
+    });
+  } else {
+    errMsg.textContent='Format not supported';
+    errBox.classList.add('on');loader.classList.remove('on');
+  }
+}
+init();
+$('retryBtn').onclick=init;
+
+/* ── Resume ── */
+function checkResume(){
+  savedTime=loadPos();
+  if(savedTime>5){
+    resumeText.textContent=`Resume from ${fmt(savedTime)}`;
+    resumeBar.classList.add('show');
+    setTimeout(()=>resumeBar.classList.remove('show'),8000);
+  }
+}
+resumeBtn.onclick=e=>{e.stopPropagation();V.currentTime=savedTime;V.play();resumeBar.classList.remove('show');showPop('▶️ Resumed')};
+resumeDismiss.onclick=e=>{e.stopPropagation();resumeBar.classList.remove('show');clearPos()};
+V.addEventListener('ended',clearPos);
+
+/* ── Format time ── */
+function fmt(s){
+  s=Math.floor(s);const h=~~(s/3600),m=~~(s%3600/60),ss=s%60;
+  return h>0?h+':'+pad(m)+':'+pad(ss):m+':'+pad(ss);
+}
+function pad(n){return String(n).padStart(2,'0')}
+
+/* ── UI show/hide ── */
+function showUI(){P.classList.add('show-ui');uiVisible=true;clearTimeout(hideT);hideT=setTimeout(()=>{if(!V.paused&&!seeking)hideUI()},3500)}
+function hideUI(){P.classList.remove('show-ui');uiVisible=false;spdP.classList.remove('on')}
+function togUI(){uiVisible?hideUI():showUI()}
+P.addEventListener('mousemove',()=>{if(!('ontouchstart' in window))showUI()});
+P.addEventListener('mouseleave',()=>{if(!V.paused&&!('ontouchstart' in window))hideUI()});
+
+/* ── Play/Pause ── */
+function tog(){V.paused?V.play():V.pause()}
+V.addEventListener('play',()=>{iPlay.style.display='none';iPause.style.display='block';cPlay.classList.add('hide');btnPlay.setAttribute('data-t','Pause (k)');resumeBar.classList.remove('show')});
+V.addEventListener('pause',()=>{iPlay.style.display='block';iPause.style.display='none';cPlay.classList.remove('hide');btnPlay.setAttribute('data-t','Play (k)');showUI()});
+V.addEventListener('waiting',()=>loader.classList.add('on'));
+V.addEventListener('canplay',()=>loader.classList.remove('on'));
+V.addEventListener('playing',()=>loader.classList.remove('on'));
+V.addEventListener('ended',()=>{iPlay.style.display='block';iPause.style.display='none';cPlay.classList.remove('hide');showUI()});
+btnPlay.onclick=e=>{e.stopPropagation();tog()};
+cPlay.onclick=e=>{e.stopPropagation();tog()};
+
+/* ── Click / tap ── */
+let dblT=null;
+const isMob='ontouchstart' in window;
+if(!isMob){
+  P.addEventListener('click',e=>{
+    if(e.target.closest('.ctrl,.btn,.center-play,.spd-panel,.resume-bar'))return;
+    if(dblT){clearTimeout(dblT);dblT=null;
+      const r=P.getBoundingClientRect(),x=e.clientX-r.left,w=r.width;
+      if(x<w*.33)doTap('left',e.clientX,e.clientY);
+      else if(x>w*.67)doTap('right',e.clientX,e.clientY);
+      else togFS();return;
+    }
+    dblT=setTimeout(()=>{dblT=null;togUI()},250);
+  });
+}
+let lastTap=0,lastTapX=0;
+if(isMob){
+  P.addEventListener('touchend',e=>{
+    if(e.target.closest('.ctrl,.btn,.center-play,.spd-panel,.resume-bar,.prog-outer'))return;
+    const now=Date.now(),t=e.changedTouches[0],x=t.clientX,y=t.clientY;
+    if(now-lastTap<300&&Math.abs(x-lastTapX)<60){
+      e.preventDefault();
+      const r=P.getBoundingClientRect(),rx=x-r.left,w=r.width;
+      if(rx<w*.4)doTap('left',x,y);else if(rx>w*.6)doTap('right',x,y);else tog();
+      lastTap=0;
+    } else {
+      lastTap=now;lastTapX=x;
+      setTimeout(()=>{if(Date.now()-lastTap>=280&&lastTap!==0)togUI()},300);
+    }
+  },{passive:false});
+}
+
+/* ── Double-tap seek ── */
+function doTap(side,x,y){
+  const amt=10;
+  V.currentTime=side==='left'?Math.max(0,V.currentTime-amt):Math.min(V.duration||0,V.currentTime+amt);
+  tapN++;
+  const lbl=side==='left'?$('lblL'):$('lblR'),txt=side==='left'?$('txtL'):$('txtR');
+  const rip=side==='left'?$('ripL'):$('ripR'),zone=side==='left'?$('tapL'):$('tapR');
+  txt.textContent=`${tapN*amt}s`;
+  const rect=zone.getBoundingClientRect();
+  rip.style.left=(x-rect.left)+'px';rip.style.top=(y-rect.top)+'px';
+  rip.classList.remove('pop');void rip.offsetWidth;rip.classList.add('pop');
+  lbl.classList.add('show');clearTimeout(tapT);
+  tapT=setTimeout(()=>{lbl.classList.remove('show');tapN=0},700);
+}
+
+/* ── Progress ── */
+V.addEventListener('loadedmetadata',()=>{tDur.textContent=fmt(V.duration)});
+V.addEventListener('timeupdate',()=>{
+  if(!seeking&&V.duration){
+    const p=V.currentTime/V.duration*100;
+    pFill.style.width=p+'%';pDot.style.left=p+'%';tCur.textContent=fmt(V.currentTime);
+  }
+});
+function updBuf(){
+  if(V.buffered.length>0&&V.duration){
+    let end=0;
+    for(let i=0;i<V.buffered.length;i++){
+      if(V.buffered.start(i)<=V.currentTime&&V.buffered.end(i)>=V.currentTime){end=V.buffered.end(i);break}
+      end=Math.max(end,V.buffered.end(i));
+    }
+    pBuf.style.width=(end/V.duration*100)+'%';
+  }
+}
+V.addEventListener('progress',updBuf);setInterval(updBuf,500);
+
+function seekPct(e){const r=pOuter.getBoundingClientRect();return Math.max(0,Math.min(1,(e.clientX-r.left)/r.width))}
+pOuter.addEventListener('mousedown',e=>{e.stopPropagation();seeking=true;const p=seekPct(e);V.currentTime=p*V.duration;setProgUI(p)});
+document.addEventListener('mousemove',e=>{if(seeking&&V.duration){const p=seekPct(e);V.currentTime=p*V.duration;setProgUI(p);tCur.textContent=fmt(p*V.duration)}});
+document.addEventListener('mouseup',()=>{seeking=false});
+pOuter.addEventListener('mousemove',e=>{if(V.duration){const p=seekPct(e);pTip.textContent=fmt(p*V.duration);pTip.style.left=(p*100)+'%'}});
+function setProgUI(p){pFill.style.width=p*100+'%';pDot.style.left=p*100+'%'}
+pOuter.addEventListener('touchstart',e=>{e.preventDefault();e.stopPropagation();seeking=true;const t=e.touches[0],r=pOuter.getBoundingClientRect();const p=Math.max(0,Math.min(1,(t.clientX-r.left)/r.width));V.currentTime=p*V.duration;setProgUI(p)},{passive:false});
+pOuter.addEventListener('touchmove',e=>{e.preventDefault();e.stopPropagation();const t=e.touches[0],r=pOuter.getBoundingClientRect();const p=Math.max(0,Math.min(1,(t.clientX-r.left)/r.width));V.currentTime=p*V.duration;setProgUI(p);tCur.textContent=fmt(p*V.duration)},{passive:false});
+pOuter.addEventListener('touchend',()=>{seeking=false});
+
+/* ── Popup ── */
+function showPop(txt){popup.textContent=txt;popup.classList.add('show');clearTimeout(popT);popT=setTimeout(()=>popup.classList.remove('show'),650)}
+
+/* ── Skip ── */
+$('btnRew').onclick=e=>{e.stopPropagation();V.currentTime=Math.max(0,V.currentTime-10);showPop('⏪ -10s')};
+$('btnFwd').onclick=e=>{e.stopPropagation();V.currentTime=Math.min(V.duration||0,V.currentTime+10);showPop('⏩ +10s')};
+
+/* ── Volume ── */
+btnMute.onclick=e=>{e.stopPropagation();V.muted=!V.muted;updVolUI();showVolHUD();saveVol()};
+volR.oninput=e=>{V.volume=e.target.value/100;V.muted=V.volume===0;updVolUI();saveVol()};
+function updVolUI(){iVol.style.display=V.muted?'none':'block';iMute.style.display=V.muted?'block':'none';volR.value=V.muted?0:V.volume*100}
+function showVolHUD(){const v=Math.round(V.muted?0:V.volume*100);vHudFill.style.height=v+'%';vHudPct.textContent=v+'%';vHud.classList.add('show');clearTimeout(volT);volT=setTimeout(()=>vHud.classList.remove('show'),800)}
+
+/* ── Speed ── */
+$('spdW').querySelector('.btn').onclick=e=>{e.stopPropagation();spdP.classList.toggle('on')};
+document.querySelectorAll('.spd-opt').forEach(o=>{
+  o.onclick=e=>{e.stopPropagation();const s=parseFloat(o.dataset.s);V.playbackRate=s;spdTag.textContent=s===1?'1x':s+'x';
+    document.querySelectorAll('.spd-opt').forEach(x=>x.classList.remove('act'));o.classList.add('act');spdP.classList.remove('on');showPop('⚡ '+spdTag.textContent)};
+});
+document.addEventListener('click',e=>{if(!e.target.closest('.spd-wrap'))spdP.classList.remove('on')});
+
+/* ── PiP ── */
+$('btnPip').onclick=async e=>{e.stopPropagation();try{document.pictureInPictureElement?await document.exitPictureInPicture():await V.requestPictureInPicture()}catch(err){}};
+
+/* ── Fullscreen ── */
+function togFS(){document.fullscreenElement?document.exitFullscreen():P.requestFullscreen().catch(()=>{if(P.webkitRequestFullscreen)P.webkitRequestFullscreen()})}
+$('btnFs').onclick=e=>{e.stopPropagation();togFS()};
+document.addEventListener('fullscreenchange',()=>{const f=!!document.fullscreenElement;iFsIn.style.display=f?'none':'block';iFsOut.style.display=f?'block':'none';P.classList.toggle('fs',f)});
+
+/* ── Keyboard ── */
+document.addEventListener('keydown',e=>{
+  const t=e.target.tagName.toLowerCase();if(t==='input'||t==='textarea')return;
+  switch(e.key.toLowerCase()){
+    case ' ':case 'k':e.preventDefault();tog();break;
+    case 'f':e.preventDefault();togFS();break;
+    case 'm':e.preventDefault();V.muted=!V.muted;updVolUI();showVolHUD();saveVol();break;
+    case 'arrowleft':e.preventDefault();V.currentTime=Math.max(0,V.currentTime-5);showPop('⏪ -5s');break;
+    case 'arrowright':e.preventDefault();V.currentTime=Math.min(V.duration||0,V.currentTime+5);showPop('⏩ +5s');break;
+    case 'arrowup':e.preventDefault();V.volume=Math.min(1,V.volume+.05);V.muted=false;updVolUI();showVolHUD();saveVol();break;
+    case 'arrowdown':e.preventDefault();V.volume=Math.max(0,V.volume-.05);updVolUI();showVolHUD();saveVol();break;
+    case 'j':e.preventDefault();V.currentTime=Math.max(0,V.currentTime-10);showPop('⏪ -10s');break;
+    case 'l':e.preventDefault();V.currentTime=Math.min(V.duration||0,V.currentTime+10);showPop('⏩ +10s');break;
+    case '0':case 'home':e.preventDefault();V.currentTime=0;showPop('⏮ Start');break;
+    case 'end':e.preventDefault();V.currentTime=V.duration;break;
+    case 'p':e.preventDefault();$('btnPip').click();break;
+    case '>':e.preventDefault();V.playbackRate=Math.min(2,V.playbackRate+.25);spdTag.textContent=V.playbackRate+'x';showPop('⚡ '+V.playbackRate+'x');break;
+    case '<':e.preventDefault();V.playbackRate=Math.max(.25,V.playbackRate-.25);spdTag.textContent=V.playbackRate+'x';showPop('⚡ '+V.playbackRate+'x');break;
+  }
+  if(e.key>='1'&&e.key<='9'){e.preventDefault();const pct=parseInt(e.key)*10;V.currentTime=V.duration*(pct/100);showPop(pct+'%')}
+  showUI();
+});
+
+})();
+</script>
+</body>
+</html>
